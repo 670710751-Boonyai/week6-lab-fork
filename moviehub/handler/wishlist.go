@@ -18,3 +18,37 @@ func (h *Handler) ListWishlist(w http.ResponseWriter, r *http.Request) {
     if err != nil { internal(w, err); return }
     writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
+
+type wishlistReq struct {
+    Note *string `json:"note"`
+}
+
+func (h *Handler) PutWishlist(w http.ResponseWriter, r *http.Request) {
+    movieID, ok := pathID(r, "movieId")
+    if !ok {
+        writeError(w, http.StatusBadRequest, "BAD_ID", "เลขหนังต้องเป็นตัวเลข")
+        return
+    }
+    var req wishlistReq
+    err := json.NewDecoder(r.Body).Decode(&req)
+    if err != nil && !errors.Is(err, io.EOF) {
+        writeError(w, http.StatusBadRequest, "BAD_JSON", "อ่านกล่อง JSON ไม่ออก")
+        return
+    }
+    if req.Note != nil {
+        trimmed := strings.TrimSpace(*req.Note)
+        if utf8.RuneCountInString(trimmed) > 200 {
+            writeError(w, http.StatusBadRequest, "BAD_NOTE", "โน้ตยาวเกิน 200 ตัวอักษร")
+            return
+        }
+        req.Note = &trimmed
+    }
+    who := mw.WhoFrom(r.Context())
+    item, err := h.Store.PutWishlist(r.Context(), who.ID, movieID, req.Note)
+    if errors.Is(err, store.ErrNoMovie) {
+        writeError(w, http.StatusNotFound, "MOVIE_NOT_FOUND", "ไม่พบหนังเรื่องนี้")
+        return
+    }
+    if err != nil { internal(w, err); return }
+    writeJSON(w, http.StatusOK, item)
+}
