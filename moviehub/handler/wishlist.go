@@ -52,3 +52,17 @@ func (h *Handler) PutWishlist(w http.ResponseWriter, r *http.Request) {
     if err != nil { internal(w, err); return }
     writeJSON(w, http.StatusOK, item)
 }
+
+func (h *Handler) DeleteWishlist(w http.ResponseWriter, r *http.Request) {
+    movieID, ok := pathID(r, "movieId")
+    if !ok {
+        writeError(w, http.StatusBadRequest, "BAD_ID", "เลขหนังต้องเป็นตัวเลข")
+        return
+    }
+    who := mw.WhoFrom(r.Context())
+    if err := h.Store.DeleteWishlist(r.Context(), who.ID, movieID); err != nil {
+        internal(w, err)
+        return
+    }
+    w.WriteHeader(http.StatusNoContent)
+}
