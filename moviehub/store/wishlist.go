@@ -35,3 +35,25 @@ func (s *Store) ListWishlist(ctx context.Context, memberID int64) ([]WishlistIte
     }
     return out, rows.Err()
 }
+
+func (s *Store) PutWishlist(ctx context.Context, memberID, movieID int64, note *string) (WishlistItem, error) {
+    item := WishlistItem{MovieID: movieID}
+    err := s.Pool.QueryRow(ctx,
+        `INSERT INTO wishlist_items (member_id, movie_id, note)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (member_id, movie_id) DO UPDATE SET note = EXCLUDED.note
+         RETURNING note, added_at`, memberID, movieID, note).
+        Scan(&item.Note, &item.AddedAt)
+    var pgErr *pgconn.PgError
+    if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+        return WishlistItem{}, ErrNoMovie
+    }
+    return item, err
+}
+
+func (s *Store) DeleteWishlist(ctx context.Context, memberID, movieID int64) error {
+    _, err := s.Pool.Exec(ctx,
+        `DELETE FROM wishlist_items WHERE member_id = $1 AND movie_id = $2`,
+        memberID, movieID)
+    return err
+}
