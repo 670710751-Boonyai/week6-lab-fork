@@ -46,3 +46,26 @@ func TestRequireLogin(t *testing.T) {
         })
     }
 }
+
+func TestRequireRole(t *testing.T) {
+    issuer := &auth.Issuer{Secret: []byte("local-test-secret-longer-than-32-characters"), TTL: time.Hour}
+    memberToken, err := issuer.Issue(7, "member")
+    if err != nil { t.Fatal(err) }
+    adminToken, err := issuer.Issue(7, "admin")
+    if err != nil { t.Fatal(err) }
+    next := RequireLogin(issuer, RequireRole("admin", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    }))
+    for _, tc := range []struct { token string; status int }{
+        {memberToken, 403},
+        {adminToken, 200},
+    } {
+        request := httptest.NewRequest(http.MethodGet, "/api/admin/members", nil)
+        request.Header.Set("Authorization", "Bearer " + tc.token)
+        response := httptest.NewRecorder()
+        next(response, request)
+        if response.Code != tc.status {
+            t.Fatalf("role request got %d, want %d: %s", response.Code, tc.status, response.Body.String())
+        }
+    }
+}
