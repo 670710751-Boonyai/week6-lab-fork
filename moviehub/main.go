@@ -38,6 +38,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", h.Login)
 	mux.HandleFunc("GET /api/movies", h.SearchMovies)
 	mux.HandleFunc("GET /api/movies/{id}/reviews", h.ListReviews)
+    mux.HandleFunc("GET /api/me", login(h.Me))
 
 	log.Println("MovieHub API ฟังอยู่ที่ :8080")
 	log.Fatal(http.ListenAndServe(":8080", mw.Logging(mux)))
