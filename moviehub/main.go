@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,13 +32,22 @@ func main() {
 
 	tickets := &auth.Issuer{Secret: []byte(secret), TTL: time.Hour}
 	h := &handler.Handler{Store: &store.Store{Pool: pool}, Tickets: tickets}
+	login := func(f http.HandlerFunc) http.HandlerFunc { return mw.RequireLogin(tickets, f) }
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", h.Register)
 	mux.HandleFunc("POST /api/auth/login", h.Login)
 	mux.HandleFunc("GET /api/movies", h.SearchMovies)
 	mux.HandleFunc("GET /api/movies/{id}/reviews", h.ListReviews)
+    mux.HandleFunc("GET /api/me", login(h.Me))
+    mux.HandleFunc("GET /api/me/wishlist", login(h.ListWishlist))
+    mux.HandleFunc("PUT /api/me/wishlist/{movieId}", login(h.PutWishlist))
+    mux.HandleFunc("DELETE /api/me/wishlist/{movieId}", login(h.DeleteWishlist))
+    mux.HandleFunc("GET /api/admin/members", login(mw.RequireRole("admin", h.AdminMembers)))
+    mux.HandleFunc("POST /api/movies/{id}/reviews", login(h.AddReview))
+    mux.HandleFunc("DELETE /api/reviews/{reviewId}", login(h.DeleteReview))
 
-	log.Println("MovieHub API ฟังอยู่ที่ :8080")
-	log.Fatal(http.ListenAndServe(":8080", mw.Logging(mux)))
+	origins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
+	log.Println("MovieHub API ฟังอยู่ที่ :8080 ต้อนรับ", origins)
+	log.Fatal(http.ListenAndServe(":8080", mw.Logging(mw.CORS(origins, mux))))
 }
