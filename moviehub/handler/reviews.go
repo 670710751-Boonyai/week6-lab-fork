@@ -54,3 +54,19 @@ func (h *Handler) AddReview(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, 201, map[string]any{"id": review.ID, "text": review.Text, "createdAt": review.CreatedAt})
     }
 }
+
+func (h *Handler) DeleteReview(w http.ResponseWriter, r *http.Request) {
+    reviewID, ok := pathID(r, "reviewId")
+    if !ok {
+        writeError(w, 400, "BAD_ID", "เลขรีวิวต้องเป็นตัวเลข")
+        return
+    }
+    who := mw.WhoFrom(r.Context())
+    err := h.Store.DeleteReview(r.Context(), reviewID, who.ID, who.Role == "admin")
+    if errors.Is(err, store.ErrNotFound) {
+        writeError(w, 404, "REVIEW_NOT_FOUND", "ไม่พบรีวิวนี้")
+        return
+    }
+    if err != nil { internal(w, err); return }
+    w.WriteHeader(http.StatusNoContent)
+}
